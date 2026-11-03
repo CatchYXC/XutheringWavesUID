@@ -51,6 +51,8 @@ exec_list.extend(
         "DELETE FROM WavesStaminaRecord WHERE id NOT IN (SELECT MAX(id) FROM WavesStaminaRecord GROUP BY user_id, bot_id, uid)",
         'CREATE TABLE IF NOT EXISTS "WavesGachaCloud" (id INTEGER NOT NULL, bot_id VARCHAR NOT NULL, user_id VARCHAR NOT NULL, uid VARCHAR NOT NULL, login_info VARCHAR NOT NULL, is_valid BOOLEAN NOT NULL, created_time INTEGER, last_used_time INTEGER, PRIMARY KEY (id))',
         'CREATE INDEX IF NOT EXISTS "ix_WavesGachaCloud_uid" ON "WavesGachaCloud" (uid)',
+        "ALTER TABLE WavesStaminaRecord ADD COLUMN stamina_push_time TEXT DEFAULT ''",
+        'ALTER TABLE WavesStaminaRecord ADD COLUMN stamina_is_push TEXT DEFAULT "off"',
     ]
 )
 
@@ -577,7 +579,26 @@ class WavesStaminaRecord(BaseModel, table=True):
     stamina_push_switch: str = Field(default="off", title="体力推送开关")
     stamina_threshold: Optional[int] = Field(default=None, title="体力阈值")
     is_ck_valid: Optional[bool] = Field(default=None, title="CK是否有效")
+    stamina_push_time: str = Field(default="", title="体力推送时间")
+    stamina_is_push: str = Field(default="off", title="催命模式")
 
+    @classmethod
+    @with_session
+    async def get_push_data(
+        cls: Type[T_WavesStaminaRecord],
+        session: AsyncSession,
+        uid: str,
+        bot_id: str,
+    ) -> Optional[T_WavesStaminaRecord]:
+        """根据 uid + bot_id 获取推送配置（对应源代码的 WavesPush.select_push_data）"""
+        sql = select(cls).where(
+            and_(
+                cls.uid == uid,
+                cls.bot_id == bot_id,
+            )
+        )
+        result = await session.execute(sql)
+        return result.scalars().first()
     @classmethod
     @with_session
     async def upsert_stamina_query(
